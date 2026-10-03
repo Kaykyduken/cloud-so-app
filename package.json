@@ -3,14 +3,22 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-     "scripts": {
-     "start": "node index.js"
-   },
+  "scripts": {
+    "start": "node index.js"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "cors": "^2.8.6",
     "express": "^5.2.1"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Kaykyduken/cloud-so-app.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Kaykyduken/cloud-so-app/issues"
+  },
+  "homepage": "https://github.com/Kaykyduken/cloud-so-app#readme"
 }
