@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>cloud-so-app — Informações do Sistema Operacional</title>
+  <style>
+    :root {
+      --bg: #f4f6fa; --card: #ffffff; --text: #1c2333; --muted: #5b6475;
+      --line: #e3e7ef; --accent: #2563eb; --ok: #16a34a; --warn: #d97706; --bad: #dc2626;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f141d; --card: #18202c; --text: #e6ebf2; --muted: #95a0b2;
+        --line: #283244; --accent: #60a5fa;
+      }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+           background: var(--bg); color: var(--text); }
+    header { padding: 28px 20px 8px; max-width: 1100px; margin: 0 auto; }
+    h1 { margin: 0 0 6px; font-size: 1.6rem; }
+    .sub { color: var(--muted); margin: 0; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: .85rem;
+             font-weight: 600; margin-top: 12px; margin-right: 6px; border: 1px solid var(--line);
+             background: var(--card); }
+    .badge.cloud { color: var(--accent); border-color: var(--accent); }
+    .badge.local { color: var(--ok); border-color: var(--ok); }
+    .badge[hidden] { display: none; }
+    main { max-width: 1100px; margin: 0 auto; padding: 16px 20px 40px;
+           display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+    section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+    h2 { font-size: 1.05rem; margin: 0 0 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: .93rem; }
+    td { padding: 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+    td:first-child { color: var(--muted); width: 48%; padding-right: 10px; }
+    td:last-child { font-weight: 600; word-break: break-word; }
+    tr:last-child td { border-bottom: none; }
+    .bar { height: 10px; background: var(--line); border-radius: 6px; overflow: hidden; margin: 6px 0 12px; }
+    .bar > div { height: 100%; background: var(--accent); width: 0; transition: width .5s; }
+    .cores { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 6px; margin-top: 10px; }
+    .core { font-size: .75rem; color: var(--muted); }
+    .core .bar { height: 6px; margin: 3px 0 0; }
+    .nota { font-size: .82rem; color: var(--muted); margin-top: 10px; line-height: 1.4; }
+    footer { text-align: center; color: var(--muted); font-size: .8rem; padding-bottom: 24px; }
+    .erro { color: var(--bad); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>☁️ cloud-so-app</h1>
+    <p class="sub">Informações do Sistema Operacional obtidas em tempo real pelo Node.js (módulos <code>os</code> e <code>process</code>)</p>
+    <span id="badgeAmbiente" class="badge">Carregando…</span>
+    <span id="badgeContainer" class="badge" hidden></span>
+  </header>
+
+  <main>
+    <section>
+      <h2>🖥️ Sistema Operacional</h2>
+      <table>
+        <tr><td>Nome do host</td><td id="hostname">—</td></tr>
+        <tr><td>Plataforma</td><td id="plataforma">—</td></tr>
+        <tr><td>Tipo / Kernel</td><td id="kernel">—</td></tr>
+        <tr><td>Versão</td><td id="versao">—</td></tr>
+        <tr><td>Arquitetura</td><td id="arquitetura">—</td></tr>
+        <tr><td>Usuário do processo</td><td id="usuario">—</td></tr>
+        <tr><td>Tempo de atividade (SO)</td><td id="uptime">—</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>⚙️ CPU</h2>
+      <table>
+        <tr><td>Quantidade de CPUs (lógicas)</td><td id="qtdCpu">—</td></tr>
+        <tr><td>Modelo</td><td id="modeloCpu">—</td></tr>
+        <tr><td>Velocidade</td><td id="velocidadeCpu">—</td></tr>
+        <tr><td>Carga média (1/5/15 min)</td><td id="loadavg">—</td></tr>
+        <tr><td>Uso total da CPU</td><td id="usoCpu">—</td></tr>
+      </table>
+      <div class="bar"><div id="barCpu"></div></div>
+      <div class="cores" id="nucleos"></div>
+    </section>
+
+    <section>
+      <h2>🧠 Memória</h2>
+      <table>
+        <tr><td>Memória total</td><td id="memTotal">—</td></tr>
+        <tr><td>Memória livre</td><td id="memLivre">—</td></tr>
+        <tr><td>Memória usada</td><td id="memUsada">—</td></tr>
+      </table>
+      <div class="bar"><div id="barMem"></div></div>
+      <table>
+        <tr><td>Limite do container (cgroup)</td><td id="memLimite">—</td></tr>
+        <tr><td>Cota de CPU do container</td><td id="cpuCota">—</td></tr>
+      </table>
+      <p class="nota">Em containers, <code>os.totalmem()</code> e <code>os.cpus()</code> mostram os recursos da máquina
+        hospedeira; o limite realmente disponível para a aplicação é definido pelo <em>cgroup</em>.</p>
+    </section>
+
+    <section>
+      <h2>🔄 Processo Node.js</h2>
+      <table>
+        <tr><td>PID</td><td id="pid">—</td></tr>
+        <tr><td>PID do processo pai (PPID)</td><td id="ppid">—</td></tr>
+        <tr><td>Versão do Node.js</td><td id="node">—</td></tr>
+        <tr><td>Tempo de atividade do processo</td><td id="procUptime">—</td></tr>
+        <tr><td>Memória residente (RSS)</td><td id="rss">—</td></tr>
+        <tr><td>Heap usado / total</td><td id="heap">—</td></tr>
+        <tr><td>Tempo de CPU (usuário / sistema)</td><td id="cpuProc">—</td></tr>
+      </table>
+    </section>
+  </main>
+
+  <footer>
+    Atualizado automaticamente a cada 2 segundos · Última leitura: <span id="geradoEm">—</span>
+  </footer>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    function bytes(n) {
+      if (n == null) return 'Sem limite / não se aplica';
+      const u = ['B', 'KB', 'MB', 'GB', 'TB'];
+      let i = 0;
+      while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+      return n.toFixed(2) + ' ' + u[i];
+    }
+
+    function duracao(seg) {
+      seg = Math.floor(seg);
+      const d = Math.floor(seg / 86400), h = Math.floor((seg % 86400) / 3600);
+      const m = Math.floor((seg % 3600) / 60), s = seg % 60;
+      return (d ? d + 'd ' : '') + h + 'h ' + m + 'min ' + s + 's';
+    }
+
+    async function atualizar() {
+      try {
+        const r = await fetch('/api/info');
+        const d = await r.json();
+
+        const nuvem = d.ambiente.tipo !== 'Local';
+        $('badgeAmbiente').textContent = (nuvem ? '☁️ ' : '💻 ') + d.ambiente.tipo +
+          (d.ambiente.regiao ? ' · região ' + d.ambiente.regiao : '');
+        $('badgeAmbiente').className = 'badge ' + (nuvem ? 'cloud' : 'local');
+        $('badgeContainer').hidden = !d.ambiente.container;
+        $('badgeContainer').textContent = '📦 Executando em container';
+
+        $('hostname').textContent = d.sistema.hostname;
+        $('plataforma').textContent = d.sistema.plataforma;
+        $('kernel').textContent = d.sistema.tipo + ' ' + d.sistema.release;
+        $('versao').textContent = d.sistema.versao || '—';
+        $('arquitetura').textContent = d.sistema.arquitetura;
+        $('usuario').textContent = d.sistema.usuario;
+        $('uptime').textContent = duracao(d.sistema.uptime);
+
+        $('qtdCpu').textContent = d.cpu.quantidade;
+        $('modeloCpu').textContent = d.cpu.modelo;
+        $('velocidadeCpu').textContent = d.cpu.velocidadeMHz ? d.cpu.velocidadeMHz + ' MHz' : '—';
+        $('loadavg').textContent = d.sistema.loadavg.map((x) => x.toFixed(2)).join(' / ') +
+          (d.sistema.plataforma === 'win32' ? ' (não suportado no Windows)' : '');
+        $('usoCpu').textContent = d.cpu.usoTotal + ' %';
+        $('barCpu').style.width = d.cpu.usoTotal + '%';
+        $('nucleos').innerHTML = d.cpu.usoPorNucleo.map((v, i) =>
+          `<div class="core">CPU ${i}: ${v}%<div class="bar"><div style="width:${v}%"></div></div></div>`).join('');
+
+        $('memTotal').textContent = bytes(d.memoria.total);
+        $('memLivre').textContent = bytes(d.memoria.livre);
+        const pct = (100 * d.memoria.usada / d.memoria.total).toFixed(1);
+        $('memUsada').textContent = bytes(d.memoria.usada) + ' (' + pct + ' %)';
+        $('barMem').style.width = pct + '%';
+        $('memLimite').textContent = bytes(d.ambiente.limiteMemoriaContainer);
+        $('cpuCota').textContent = d.ambiente.cotaCpuContainer != null
+          ? d.ambiente.cotaCpuContainer.toFixed(2) + ' CPU' : 'Sem limite / não se aplica';
+
+        $('pid').textContent = d.processo.pid;
+        $('ppid').textContent = d.processo.ppid;
+        $('node').textContent = d.processo.versaoNode;
+        $('procUptime').textContent = duracao(d.processo.uptime);
+        $('rss').textContent = bytes(d.processo.rss);
+        $('heap').textContent = bytes(d.processo.heapUsado) + ' / ' + bytes(d.processo.heapTotal);
+        $('cpuProc').textContent = d.processo.cpuUsuarioMs.toFixed(0) + ' ms / ' +
+          d.processo.cpuSistemaMs.toFixed(0) + ' ms';
+
+        $('geradoEm').textContent = new Date(d.geradoEm).toLocaleString('pt-BR');
+      } catch (e) {
+        $('badgeAmbiente').innerHTML = '<span class="erro">Erro ao consultar /api/info</span>';
+      }
+    }
+
+    atualizar();
+    setInterval(atualizar, 2000);
+  </script>
+</body>
+</html>
