@@ -3,123 +3,381 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>cloud-so-app — Informações do Sistema Operacional</title>
+  <title>SO Dashboard — cloud-so-app</title>
+  <link rel="icon" href="data:,">
   <style>
     :root {
       --bg: #f4f6fa; --card: #ffffff; --text: #1c2333; --muted: #5b6475;
       --line: #e3e7ef; --accent: #2563eb; --ok: #16a34a; --warn: #d97706; --bad: #dc2626;
+      --ok-bg: #dcfce7; --warn-bg: #fef3c7; --bad-bg: #fee2e2;
     }
     @media (prefers-color-scheme: dark) {
       :root {
         --bg: #0f141d; --card: #18202c; --text: #e6ebf2; --muted: #95a0b2;
-        --line: #283244; --accent: #60a5fa;
+        --line: #283244; --accent: #60a5fa; --ok: #4ade80; --warn: #fbbf24; --bad: #f87171;
+        --ok-bg: #14321f; --warn-bg: #3a2c0d; --bad-bg: #3b1515;
       }
     }
     * { box-sizing: border-box; }
     body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
            background: var(--bg); color: var(--text); }
-    header { padding: 28px 20px 8px; max-width: 1100px; margin: 0 auto; }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+    header { padding: 26px 0 6px; }
     h1 { margin: 0 0 6px; font-size: 1.6rem; }
     .sub { color: var(--muted); margin: 0; }
+    .badges { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
     .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: .85rem;
-             font-weight: 600; margin-top: 12px; margin-right: 6px; border: 1px solid var(--line);
-             background: var(--card); }
+             font-weight: 600; border: 1px solid var(--line); background: var(--card); }
     .badge.cloud { color: var(--accent); border-color: var(--accent); }
     .badge.local { color: var(--ok); border-color: var(--ok); }
     .badge[hidden] { display: none; }
-    main { max-width: 1100px; margin: 0 auto; padding: 16px 20px 40px;
-           display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
-    section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+
+    /* KPIs */
+    .kpis { display: grid; gap: 12px; margin: 18px 0 16px;
+            grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); }
+    .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+    .kpi .rotulo { font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .kpi .valor { font-size: 1.7rem; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums;
+                  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .kpi .valor.menor { font-size: 1.25rem; padding: 5px 0; }
+    .kpi .det { font-size: .78rem; color: var(--muted); margin-top: 4px; min-height: 1em; }
+    .kpi .bar { margin: 8px 0 0; }
+    .status { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 1rem; }
+    .status.n0 { background: var(--ok-bg); color: var(--ok); }
+    .status.n1 { background: var(--warn-bg); color: var(--warn); }
+    .status.n2 { background: var(--bad-bg); color: var(--bad); }
+
+    /* Cards */
+    main { display: grid; gap: 16px; padding-bottom: 32px;
+           grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+    section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; min-width: 0; }
+    section.largo { grid-column: 1 / -1; }
     h2 { font-size: 1.05rem; margin: 0 0 12px; }
-    table { width: 100%; border-collapse: collapse; font-size: .93rem; }
-    td { padding: 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
-    td:first-child { color: var(--muted); width: 48%; padding-right: 10px; }
-    td:last-child { font-weight: 600; word-break: break-word; }
+    h3 { font-size: .9rem; margin: 16px 0 6px; color: var(--muted); }
+    table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+    td, th { padding: 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; text-align: left; }
+    th { color: var(--muted); font-weight: 600; font-size: .8rem; }
+    table.kv td:first-child { color: var(--muted); width: 46%; padding-right: 10px; }
+    table.kv td:last-child { font-weight: 600; word-break: break-word; }
+    table.lista td, table.lista th { padding-right: 10px; word-break: break-word; }
     tr:last-child td { border-bottom: none; }
+    code, .mono { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: .85em; }
     .bar { height: 10px; background: var(--line); border-radius: 6px; overflow: hidden; margin: 6px 0 12px; }
     .bar > div { height: 100%; background: var(--accent); width: 0; transition: width .5s; }
-    .cores { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 6px; margin-top: 10px; }
+    .cores { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; margin-top: 10px; }
     .core { font-size: .75rem; color: var(--muted); }
     .core .bar { height: 6px; margin: 3px 0 0; }
-    .nota { font-size: .82rem; color: var(--muted); margin-top: 10px; line-height: 1.4; }
-    footer { text-align: center; color: var(--muted); font-size: .8rem; padding-bottom: 24px; }
+    .nota { font-size: .82rem; color: var(--muted); margin-top: 10px; line-height: 1.45; }
+    .rolagem { max-height: 320px; overflow: auto; }
+    footer { text-align: center; color: var(--muted); font-size: .8rem; padding: 0 16px 24px; }
     .erro { color: var(--bad); }
+    /* Gerenciador de tarefas */
+    .tm { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+    .tm-topo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+    .tm-topo h2 { margin: 0; }
+    .abas { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+    .abas button { font: inherit; font-size: .88rem; padding: 6px 14px; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+    .abas button[aria-selected="true"] { background: var(--accent); color: var(--card); }
+    .abas button:focus-visible, .tm input:focus-visible, .tm select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .resumo { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .chip { font-size: .8rem; padding: 3px 9px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); color: var(--muted); }
+    .chip b { color: var(--text); }
+    .cadeia { font-size: .85rem; color: var(--muted); margin: 0 0 10px; line-height: 1.6; }
+    .cadeia .no { display: inline-block; padding: 1px 8px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); color: var(--text); font-weight: 600; }
+    .controles { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+    .controles input, .controles select { font: inherit; font-size: .88rem; padding: 6px 10px; border-radius: 8px;
+      border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+    .controles input { flex: 1 1 200px; min-width: 0; }
+    .tabela-proc { max-height: 440px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+    .tabela-proc table { font-size: .84rem; min-width: 760px; }
+    .tabela-proc th { position: sticky; top: 0; background: var(--card); z-index: 1; padding: 8px; cursor: pointer; user-select: none; white-space: nowrap; }
+    .tabela-proc th[aria-sort="descending"]::after { content: " ▼"; font-size: .7em; }
+    .tabela-proc th[aria-sort="ascending"]::after { content: " ▲"; font-size: .7em; }
+    .tabela-proc td { padding: 6px 8px; white-space: nowrap; }
+    .tabela-proc td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .tabela-proc th.num { text-align: right; }
+    .tabela-proc td.cmd { max-width: 340px; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+    .tabela-proc tr.app td { font-weight: 700; }
+    .tabela-proc tr.app td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+    .tabela-proc tr.ancestral td:first-child { box-shadow: inset 3px 0 0 var(--muted); }
+    .calor { position: relative; }
+    .estado { font-size: .75rem; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); }
+    .graficos { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+    .grafico h3 { margin: 0 0 2px; color: var(--text); font-size: .95rem; }
+    .grafico .atual { font-size: .82rem; color: var(--muted); margin-bottom: 6px; }
+    .grafico .area { position: relative; }
+    .grafico svg { display: block; width: 100%; height: 170px; overflow: visible; }
+    .grafico .grade { stroke: var(--line); stroke-width: 1; }
+    .grafico .eixo { fill: var(--muted); font-size: 10px; }
+    .grafico .linha { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+    .grafico .lavagem { fill: var(--accent); opacity: .1; }
+    .grafico .ponto { fill: var(--accent); stroke: var(--card); stroke-width: 2; }
+    .grafico .mira { stroke: var(--muted); stroke-width: 1; }
+    .dica { position: absolute; pointer-events: none; background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+      padding: 6px 9px; font-size: .8rem; box-shadow: 0 4px 14px rgba(0,0,0,.12); white-space: nowrap; transform: translate(-50%, -110%); }
+    .dica b { font-size: .95rem; }
+    .dica span { color: var(--muted); }
+    [hidden] { display: none !important; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>☁️ cloud-so-app</h1>
-    <p class="sub">Informações do Sistema Operacional obtidas em tempo real pelo Node.js (módulos <code>os</code> e <code>process</code>)</p>
-    <span id="badgeAmbiente" class="badge">Carregando…</span>
-    <span id="badgeContainer" class="badge" hidden></span>
-  </header>
+  <div class="wrap">
+    <header>
+      <h1>🖥️ SO Dashboard</h1>
+      <p class="sub">Monitoramento do Sistema Operacional em tempo real com Node.js (módulos <code>os</code>, <code>process</code> e <code>fs</code>)</p>
+      <div class="badges">
+        <span id="badgeAmbiente" class="badge">Carregando…</span>
+        <span id="badgeModelo" class="badge" hidden></span>
+        <span id="badgeContainer" class="badge" hidden>📦 Executando em container</span>
+      </div>
+    </header>
 
-  <main>
-    <section>
-      <h2>🖥️ Sistema Operacional</h2>
-      <table>
-        <tr><td>Nome do host</td><td id="hostname">—</td></tr>
-        <tr><td>Plataforma</td><td id="plataforma">—</td></tr>
-        <tr><td>Tipo / Kernel</td><td id="kernel">—</td></tr>
-        <tr><td>Versão</td><td id="versao">—</td></tr>
-        <tr><td>Arquitetura</td><td id="arquitetura">—</td></tr>
-        <tr><td>Usuário do processo</td><td id="usuario">—</td></tr>
-        <tr><td>Tempo de atividade (SO)</td><td id="uptime">—</td></tr>
-      </table>
+    <!-- Indicadores principais -->
+    <div class="kpis">
+      <div class="kpi">
+        <div class="rotulo">Uso de RAM</div>
+        <div class="valor" id="kRam">—</div>
+        <div class="bar"><div id="kRamBar"></div></div>
+      </div>
+      <div class="kpi">
+        <div class="rotulo">CPU média</div>
+        <div class="valor" id="kCpu">—</div>
+        <div class="bar"><div id="kCpuBar"></div></div>
+      </div>
+      <div class="kpi">
+        <div class="rotulo">Uptime do SO</div>
+        <div class="valor menor" id="kUptime">—</div>
+        <div class="det" id="kUptimeDet"></div>
+      </div>
+      <div class="kpi">
+        <div class="rotulo">Arquivos do projeto</div>
+        <div class="valor" id="kArquivos">—</div>
+        <div class="det">sem node_modules e .git</div>
+      </div>
+      <div class="kpi">
+        <div class="rotulo">IP principal</div>
+        <div class="valor menor mono" id="kIp">—</div>
+        <div class="det" id="kIpDet"></div>
+      </div>
+      <div class="kpi">
+        <div class="rotulo">Processos</div>
+        <div class="valor" id="kProc">—</div>
+        <div class="det" id="kProcDet"></div>
+      </div>
+      <div class="kpi">
+        <div class="rotulo">Status geral</div>
+        <div class="valor menor"><span class="status" id="kStatus">—</span></div>
+        <div class="det" id="kStatusDet"></div>
+      </div>
+    </div>
+
+    <!-- Implementação original: Gerenciador de tarefas -->
+    <section class="tm" aria-labelledby="tmTitulo">
+      <div class="tm-topo">
+        <h2 id="tmTitulo">📋 Gerenciador de tarefas</h2>
+        <div class="abas" role="tablist">
+          <button role="tab" id="abaProc" aria-selected="true" aria-controls="painelProc">Processos</button>
+          <button role="tab" id="abaDes" aria-selected="false" aria-controls="painelDes">Desempenho</button>
+        </div>
+      </div>
+
+      <div id="painelProc" role="tabpanel" aria-labelledby="abaProc">
+        <div class="resumo" id="procResumo"></div>
+        <p class="cadeia" id="procCadeia"></p>
+        <div class="controles">
+          <input id="procFiltro" type="search" placeholder="Filtrar por nome, comando, usuário ou PID" aria-label="Filtrar processos" />
+          <select id="procOrdem" aria-label="Ordenar por">
+            <option value="cpu">Ordenar por CPU</option>
+            <option value="memoria">Ordenar por memória</option>
+            <option value="threads">Ordenar por threads</option>
+            <option value="pid">Ordenar por PID</option>
+            <option value="nome">Ordenar por nome</option>
+          </select>
+        </div>
+        <div class="tabela-proc">
+          <table>
+            <thead>
+              <tr>
+                <th data-col="nome">Nome</th>
+                <th data-col="pid" class="num">PID</th>
+                <th data-col="ppid" class="num">PPID</th>
+                <th data-col="usuario">Usuário</th>
+                <th data-col="estado">Estado</th>
+                <th data-col="threads" class="num">Threads</th>
+                <th data-col="cpu" class="num">CPU</th>
+                <th data-col="memoria" class="num">Memória</th>
+                <th data-col="tempoCpu" class="num">Tempo de CPU</th>
+                <th data-col="comando">Comando</th>
+              </tr>
+            </thead>
+            <tbody id="procCorpo"><tr><td colspan="10">Carregando…</td></tr></tbody>
+          </table>
+        </div>
+        <p class="nota" id="procNota"></p>
+      </div>
+
+      <div id="painelDes" role="tabpanel" aria-labelledby="abaDes" hidden>
+        <div class="graficos">
+          <div class="grafico" id="gCpu"><h3>CPU</h3><div class="atual"></div><div class="area"></div></div>
+          <div class="grafico" id="gRam"><h3>Memória</h3><div class="atual"></div><div class="area"></div></div>
+          <div class="grafico" id="gProc"><h3>Processos</h3><div class="atual"></div><div class="area"></div></div>
+        </div>
+        <p class="nota">Histórico das últimas leituras (uma a cada 3 segundos, até 3 minutos), guardado no navegador enquanto a página está aberta.
+          Passe o mouse sobre os gráficos para ver cada valor.</p>
+      </div>
     </section>
 
-    <section>
-      <h2>⚙️ CPU</h2>
-      <table>
-        <tr><td>Quantidade de CPUs (lógicas)</td><td id="qtdCpu">—</td></tr>
-        <tr><td>Modelo</td><td id="modeloCpu">—</td></tr>
-        <tr><td>Velocidade</td><td id="velocidadeCpu">—</td></tr>
-        <tr><td>Carga média (1/5/15 min)</td><td id="loadavg">—</td></tr>
-        <tr><td>Uso total da CPU</td><td id="usoCpu">—</td></tr>
-      </table>
-      <div class="bar"><div id="barCpu"></div></div>
-      <div class="cores" id="nucleos"></div>
-    </section>
+    <main>
+      <section>
+        <h2>📌 Sistema Operacional</h2>
+        <table class="kv">
+          <tr><td>Nome da máquina (hostname)</td><td id="hostname">—</td></tr>
+          <tr><td>Tipo do sistema</td><td id="tipo">—</td></tr>
+          <tr><td>Plataforma</td><td id="plataforma">—</td></tr>
+          <tr><td>Versão do kernel</td><td id="release">—</td></tr>
+          <tr><td>Build do kernel</td><td id="versao">—</td></tr>
+          <tr><td>Arquitetura do processador</td><td id="arquitetura">—</td></tr>
+          <tr><td>Endianness</td><td id="endianness">—</td></tr>
+          <tr><td>Versão do Node.js</td><td id="node">—</td></tr>
+          <tr><td>Fuso horário</td><td id="fuso">—</td></tr>
+        </table>
+        <p class="nota"><b>Endianness</b> é a ordem dos bytes na memória: <code>LE</code> (little-endian, byte menos
+          significativo primeiro), usado por x86 e pela maioria dos ARM, ou <code>BE</code> (big-endian).</p>
+      </section>
 
-    <section>
-      <h2>🧠 Memória</h2>
-      <table>
-        <tr><td>Memória total</td><td id="memTotal">—</td></tr>
-        <tr><td>Memória livre</td><td id="memLivre">—</td></tr>
-        <tr><td>Memória usada</td><td id="memUsada">—</td></tr>
-      </table>
-      <div class="bar"><div id="barMem"></div></div>
-      <table>
-        <tr><td>Limite do container (cgroup)</td><td id="memLimite">—</td></tr>
-        <tr><td>Cota de CPU do container</td><td id="cpuCota">—</td></tr>
-      </table>
-      <p class="nota">Em containers, <code>os.totalmem()</code> e <code>os.cpus()</code> mostram os recursos da máquina
-        hospedeira; o limite realmente disponível para a aplicação é definido pelo <em>cgroup</em>.</p>
-    </section>
+      <section>
+        <h2>⚙️ CPU</h2>
+        <table class="kv">
+          <tr><td>Núcleos lógicos</td><td id="qtdCpu">—</td></tr>
+          <tr><td>Modelo</td><td id="modeloCpu">—</td></tr>
+          <tr><td>Velocidade</td><td id="velocidadeCpu">—</td></tr>
+          <tr><td>Carga média (1 / 5 / 15 min)</td><td id="loadavg">—</td></tr>
+          <tr><td>Uso médio</td><td id="usoCpu">—</td></tr>
+          <tr><td>Método de medição</td><td id="metodoCpu">—</td></tr>
+        </table>
+        <div class="cores" id="nucleos"></div>
+        <p class="nota">Carga média = processos executando ou aguardando CPU. Acima do número de núcleos, há fila.</p>
+      </section>
 
-    <section>
-      <h2>🔄 Processo Node.js</h2>
-      <table>
-        <tr><td>PID</td><td id="pid">—</td></tr>
-        <tr><td>PID do processo pai (PPID)</td><td id="ppid">—</td></tr>
-        <tr><td>Versão do Node.js</td><td id="node">—</td></tr>
-        <tr><td>Tempo de atividade do processo</td><td id="procUptime">—</td></tr>
-        <tr><td>Memória residente (RSS)</td><td id="rss">—</td></tr>
-        <tr><td>Heap usado / total</td><td id="heap">—</td></tr>
-        <tr><td>Tempo de CPU (usuário / sistema)</td><td id="cpuProc">—</td></tr>
-      </table>
-    </section>
-  </main>
+      <section>
+        <h2>🧠 Memória</h2>
+        <table class="kv">
+          <tr><td>Total (vista pelo SO)</td><td id="memTotal">—</td></tr>
+          <tr><td>Usada</td><td id="memUsada">—</td></tr>
+          <tr><td>Livre</td><td id="memLivre">—</td></tr>
+        </table>
+        <div class="bar"><div id="barMem"></div></div>
+        <h3>Limites do container (cgroup)</h3>
+        <table class="kv">
+          <tr><td>Limite de memória</td><td id="memLimite">—</td></tr>
+          <tr><td>Memória usada pelo container</td><td id="memContainer">—</td></tr>
+          <tr><td>Cota de CPU</td><td id="cpuCota">—</td></tr>
+        </table>
+        <p class="nota">Em containers, <code>os.totalmem()</code> e <code>os.cpus()</code> mostram a máquina hospedeira;
+          o que a aplicação pode usar de fato é definido pelo <em>cgroup</em>.</p>
+      </section>
+
+      <section>
+        <h2>☁️ Ambiente de execução</h2>
+        <table class="kv">
+          <tr><td>Onde está rodando</td><td id="envPlataforma">—</td></tr>
+          <tr><td>Modelo de execução</td><td id="envModelo">—</td></tr>
+          <tr><td>Região</td><td id="envRegiao">—</td></tr>
+          <tr><td>Serviço / endereço</td><td id="envServico">—</td></tr>
+          <tr><td>Porta (PORT)</td><td id="envPorta">—</td></tr>
+          <tr><td>Modo (NODE_ENV)</td><td id="envNodeEnv">—</td></tr>
+          <tr><td>Container</td><td id="envContainer">—</td></tr>
+        </table>
+        <h3>Indícios de virtualização</h3>
+        <table class="kv">
+          <tr><td>Flag <code>hypervisor</code> na CPU</td><td id="virtFlag">—</td></tr>
+          <tr><td>Fabricante / produto (DMI)</td><td id="virtDmi">—</td></tr>
+          <tr><td>Kernel de nuvem AWS</td><td id="virtAws">—</td></tr>
+        </table>
+      </section>
+
+      <section>
+        <h2>🔑 Variáveis de ambiente</h2>
+        <p class="nota" style="margin-top:0">Valores mostrados apenas para variáveis conhecidas e não sensíveis.
+          As demais podem conter senhas e tokens, por isso aparece só a quantidade.</p>
+        <table class="lista">
+          <thead><tr><th>Variável</th><th>Valor</th></tr></thead>
+          <tbody id="variaveis"></tbody>
+        </table>
+        <p class="nota" id="variaveisTotal"></p>
+      </section>
+
+      <section>
+        <h2>🌐 Rede</h2>
+        <table class="kv">
+          <tr><td>IP principal (IPv4 externo)</td><td id="ipPrincipal" class="mono">—</td></tr>
+          <tr><td>Endereços encontrados</td><td id="qtdInterfaces">—</td></tr>
+        </table>
+        <div class="rolagem">
+          <table class="lista">
+            <thead><tr><th>Interface</th><th>Endereço</th><th>Família</th><th>Interna</th></tr></thead>
+            <tbody id="interfaces"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2>📂 Arquivos do projeto</h2>
+        <table class="kv">
+          <tr><td>Diretório</td><td id="dirProjeto" class="mono">—</td></tr>
+          <tr><td>Total de arquivos</td><td id="qtdArquivos">—</td></tr>
+        </table>
+        <div class="rolagem">
+          <table class="lista">
+            <thead><tr><th>Nome</th><th>Tipo</th><th>Tamanho</th></tr></thead>
+            <tbody id="arquivos"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2>👤 Usuário do processo</h2>
+        <table class="kv">
+          <tr><td>Usuário</td><td id="usuario">—</td></tr>
+          <tr><td>UID / GID</td><td id="uidgid">—</td></tr>
+          <tr><td>Shell</td><td id="shell">—</td></tr>
+          <tr><td>Diretório home</td><td id="home" class="mono">—</td></tr>
+          <tr><td>Diretório temporário</td><td id="temp" class="mono">—</td></tr>
+        </table>
+        <p class="nota">UID 0 = root. Plataformas de nuvem costumam rodar a aplicação com um usuário sem privilégios.</p>
+      </section>
+
+      <section>
+        <h2>🔄 Processo Node.js</h2>
+        <table class="kv">
+          <tr><td>PID / PPID</td><td id="pid">—</td></tr>
+          <tr><td>Node.js / V8</td><td id="nodeV8">—</td></tr>
+          <tr><td>Tempo de atividade do processo</td><td id="procUptime">—</td></tr>
+          <tr><td>Memória residente (RSS)</td><td id="rss">—</td></tr>
+          <tr><td>Heap usado / total</td><td id="heap">—</td></tr>
+          <tr><td>Tempo de CPU (usuário / sistema)</td><td id="cpuProc">—</td></tr>
+          <tr><td>Diretório de trabalho</td><td id="cwd" class="mono">—</td></tr>
+          <tr><td>Executável</td><td id="execPath" class="mono">—</td></tr>
+        </table>
+      </section>
+    </main>
+  </div>
 
   <footer>
-    Atualizado automaticamente a cada 2 segundos · Última leitura: <span id="geradoEm">—</span>
+    Atualizado automaticamente a cada 3 segundos · Última leitura: <span id="geradoEm">—</span>
   </footer>
 
   <script>
     const $ = (id) => document.getElementById(id);
+    const set = (id, v) => { $(id).textContent = (v === null || v === undefined || v === '') ? '—' : v; };
+
+    function esc(s) {
+      return String(s ?? '—').replace(/[&<>"']/g, (c) =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
 
     function bytes(n) {
-      if (n == null) return 'Sem limite / não se aplica';
+      if (n === null || n === undefined) return null;
       const u = ['B', 'KB', 'MB', 'GB', 'TB'];
       let i = 0;
       while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
@@ -133,62 +391,349 @@
       return (d ? d + 'd ' : '') + h + 'h ' + m + 'min ' + s + 's';
     }
 
+    function duracaoCurta(seg) {
+      const d = Math.floor(seg / 86400), h = Math.floor((seg % 86400) / 3600), m = Math.floor((seg % 3600) / 60);
+      return d ? `${d}d ${h}h ${m}m` : `${h}h ${m}m`;
+    }
+
+    const simNao = (v) => (v ? 'Sim' : 'Não');
+
     async function atualizar() {
       try {
-        const r = await fetch('/api/info');
+        const r = await fetch('/api/info', { cache: 'no-store' });
         const d = await r.json();
+        const amb = d.ambiente;
+        const nuvem = amb.tipo !== 'Local';
 
-        const nuvem = d.ambiente.tipo !== 'Local';
-        $('badgeAmbiente').textContent = (nuvem ? '☁️ ' : '💻 ') + d.ambiente.tipo +
-          (d.ambiente.regiao ? ' · região ' + d.ambiente.regiao : '');
+        /* Cabeçalho */
+        $('badgeAmbiente').textContent = (nuvem ? '☁️ Nuvem · ' + amb.plataforma : '💻 Local') +
+          (amb.regiao ? ' · região ' + amb.regiao : '');
         $('badgeAmbiente').className = 'badge ' + (nuvem ? 'cloud' : 'local');
-        $('badgeContainer').hidden = !d.ambiente.container;
-        $('badgeContainer').textContent = '📦 Executando em container';
+        $('badgeModelo').hidden = false;
+        $('badgeModelo').textContent = amb.modelo;
+        $('badgeContainer').hidden = !amb.container;
 
-        $('hostname').textContent = d.sistema.hostname;
-        $('plataforma').textContent = d.sistema.plataforma;
-        $('kernel').textContent = d.sistema.tipo + ' ' + d.sistema.release;
-        $('versao').textContent = d.sistema.versao || '—';
-        $('arquitetura').textContent = d.sistema.arquitetura;
-        $('usuario').textContent = d.sistema.usuario;
-        $('uptime').textContent = duracao(d.sistema.uptime);
+        /* KPIs */
+        set('kRam', d.memoria.percentual.toFixed(0) + '%');
+        $('kRamBar').style.width = d.memoria.percentual + '%';
+        set('kCpu', d.cpu.usoMedio.toFixed(0) + '%');
+        $('kCpuBar').style.width = d.cpu.usoMedio + '%';
+        set('kUptime', duracaoCurta(d.sistema.uptime));
+        set('kUptimeDet', 'processo: ' + duracaoCurta(d.processo.uptime));
+        set('kArquivos', d.arquivos.quantidade);
+        set('kIp', d.rede.ipPrincipal || 'N/A');
+        set('kIpDet', d.rede.interfaces.length + ' endereço(s) de rede');
+        $('kStatus').textContent = d.status.rotulo;
+        $('kStatus').className = 'status n' + d.status.nivel;
+        set('kStatusDet', d.status.motivos.length ? d.status.motivos.join('; ') : 'recursos dentro do normal');
 
-        $('qtdCpu').textContent = d.cpu.quantidade;
-        $('modeloCpu').textContent = d.cpu.modelo;
-        $('velocidadeCpu').textContent = d.cpu.velocidadeMHz ? d.cpu.velocidadeMHz + ' MHz' : '—';
-        $('loadavg').textContent = d.sistema.loadavg.map((x) => x.toFixed(2)).join(' / ') +
-          (d.sistema.plataforma === 'win32' ? ' (não suportado no Windows)' : '');
-        $('usoCpu').textContent = d.cpu.usoTotal + ' %';
-        $('barCpu').style.width = d.cpu.usoTotal + '%';
+        /* Sistema */
+        set('hostname', d.sistema.hostname);
+        set('tipo', d.sistema.tipo);
+        set('plataforma', d.sistema.plataforma);
+        set('release', d.sistema.release);
+        set('versao', d.sistema.versao);
+        set('arquitetura', d.sistema.arquitetura);
+        set('endianness', d.sistema.endianness === 'LE' ? 'LE (little-endian)' : 'BE (big-endian)');
+        set('node', d.processo.versaoNode);
+        set('fuso', d.sistema.fusoHorario);
+
+        /* CPU */
+        set('qtdCpu', d.cpu.quantidade + (d.cpu.paralelismoDisponivel !== d.cpu.quantidade
+          ? ` (paralelismo disponível: ${d.cpu.paralelismoDisponivel})` : ''));
+        set('modeloCpu', d.cpu.modelo);
+        set('velocidadeCpu', d.cpu.velocidadeMHz ? d.cpu.velocidadeMHz + ' MHz' : 'não informada');
+        set('loadavg', d.sistema.loadavg.map((x) => x.toFixed(2)).join(' / ') +
+          (d.sistema.plataforma === 'win32' ? ' (não suportado no Windows)' : ''));
+        set('usoCpu', d.cpu.usoMedio + ' %');
+        set('metodoCpu', d.cpu.metodoMedicao);
         $('nucleos').innerHTML = d.cpu.usoPorNucleo.map((v, i) =>
           `<div class="core">CPU ${i}: ${v}%<div class="bar"><div style="width:${v}%"></div></div></div>`).join('');
 
-        $('memTotal').textContent = bytes(d.memoria.total);
-        $('memLivre').textContent = bytes(d.memoria.livre);
-        const pct = (100 * d.memoria.usada / d.memoria.total).toFixed(1);
-        $('memUsada').textContent = bytes(d.memoria.usada) + ' (' + pct + ' %)';
-        $('barMem').style.width = pct + '%';
-        $('memLimite').textContent = bytes(d.ambiente.limiteMemoriaContainer);
-        $('cpuCota').textContent = d.ambiente.cotaCpuContainer != null
-          ? d.ambiente.cotaCpuContainer.toFixed(2) + ' CPU' : 'Sem limite / não se aplica';
+        /* Memória */
+        set('memTotal', bytes(d.memoria.total));
+        set('memUsada', bytes(d.memoria.usada) + ' (' + d.memoria.percentual + ' %)');
+        set('memLivre', bytes(d.memoria.livre));
+        $('barMem').style.width = d.memoria.percentual + '%';
+        set('memLimite', bytes(amb.limiteMemoriaContainer) || 'Sem limite / não se aplica');
+        set('memContainer', amb.memoriaUsadaContainer != null
+          ? bytes(amb.memoriaUsadaContainer) + (amb.limiteMemoriaContainer
+            ? ' (' + (100 * amb.memoriaUsadaContainer / amb.limiteMemoriaContainer).toFixed(1) + ' % do limite)' : '')
+          : 'não disponível');
+        set('cpuCota', amb.cotaCpuContainer != null ? amb.cotaCpuContainer.toFixed(2) + ' CPU' : 'Sem limite / não se aplica');
 
-        $('pid').textContent = d.processo.pid;
-        $('ppid').textContent = d.processo.ppid;
-        $('node').textContent = d.processo.versaoNode;
-        $('procUptime').textContent = duracao(d.processo.uptime);
-        $('rss').textContent = bytes(d.processo.rss);
-        $('heap').textContent = bytes(d.processo.heapUsado) + ' / ' + bytes(d.processo.heapTotal);
-        $('cpuProc').textContent = d.processo.cpuUsuarioMs.toFixed(0) + ' ms / ' +
-          d.processo.cpuSistemaMs.toFixed(0) + ' ms';
+        /* Ambiente */
+        set('envPlataforma', nuvem ? 'Nuvem: ' + amb.plataforma + (amb.etapa ? ' (' + amb.etapa + ')' : '') : 'Local');
+        set('envModelo', amb.modelo);
+        set('envRegiao', amb.regiao || 'não informada');
+        set('envServico', amb.servico);
+        set('envPorta', amb.porta || '3000 (padrão local)');
+        set('envNodeEnv', amb.nodeEnv || 'não definido (development)');
+        set('envContainer', simNao(amb.container));
+        set('virtFlag', simNao(amb.virtualizacao.flagHypervisor) +
+          (amb.virtualizacao.flagHypervisor ? ' (SO roda sobre um hypervisor)' : ''));
+        set('virtDmi', [amb.virtualizacao.fabricante, amb.virtualizacao.produto].filter(Boolean).join(' / ') || 'não acessível');
+        set('virtAws', simNao(amb.virtualizacao.kernelAws));
 
-        $('geradoEm').textContent = new Date(d.geradoEm).toLocaleString('pt-BR');
+        /* Variáveis */
+        const vars = Object.entries(amb.variaveis.visiveis);
+        $('variaveis').innerHTML = vars.length
+          ? vars.map(([k, v]) => `<tr><td class="mono">${esc(k)}</td><td class="mono">${esc(v)}</td></tr>`).join('')
+          : '<tr><td colspan="2">Nenhuma variável conhecida definida</td></tr>';
+        set('variaveisTotal', `Total de variáveis de ambiente no processo: ${amb.variaveis.total}`);
+
+        /* Rede */
+        set('ipPrincipal', d.rede.ipPrincipal || 'N/A');
+        set('qtdInterfaces', d.rede.interfaces.length);
+        $('interfaces').innerHTML = d.rede.interfaces.map((i) =>
+          `<tr><td>${esc(i.interface)}</td><td class="mono">${esc(i.endereco)}</td><td>${esc(i.familia)}</td><td>${simNao(i.interna)}</td></tr>`).join('')
+          || '<tr><td colspan="4">Nenhuma interface visível</td></tr>';
+
+        /* Arquivos */
+        set('dirProjeto', d.arquivos.diretorio);
+        set('qtdArquivos', d.arquivos.quantidade);
+        $('arquivos').innerHTML = d.arquivos.lista.map((f) =>
+          `<tr><td class="mono">${esc(f.nome)}</td><td>${esc(f.tipo)}</td><td>${esc(f.tamanho != null ? bytes(f.tamanho) : '—')}</td></tr>`).join('');
+
+        /* Usuário */
+        set('usuario', d.usuario.nome);
+        set('uidgid', (d.usuario.uid ?? '—') + ' / ' + (d.usuario.gid ?? '—'));
+        set('shell', d.usuario.shell);
+        set('home', d.usuario.home);
+        set('temp', d.usuario.temp);
+
+        /* Processo */
+        set('pid', d.processo.pid + ' / ' + d.processo.ppid);
+        set('nodeV8', d.processo.versaoNode + ' / V8 ' + d.processo.versaoV8);
+        set('procUptime', duracao(d.processo.uptime));
+        set('rss', bytes(d.processo.rss));
+        set('heap', bytes(d.processo.heapUsado) + ' / ' + bytes(d.processo.heapTotal));
+        set('cpuProc', d.processo.cpuUsuarioMs.toFixed(0) + ' ms / ' + d.processo.cpuSistemaMs.toFixed(0) + ' ms');
+        set('cwd', d.processo.cwd);
+        set('execPath', d.processo.execPath);
+
+        set('geradoEm', new Date(d.geradoEm).toLocaleString('pt-BR'));
+        registrar('cpu', d.cpu.usoMedio);
+        registrar('ram', d.memoria.percentual);
       } catch (e) {
         $('badgeAmbiente').innerHTML = '<span class="erro">Erro ao consultar /api/info</span>';
       }
     }
 
+
+    /* ================= Gerenciador de tarefas ================= */
+    const MAX_PONTOS = 60; // 60 leituras × 3 s = 3 minutos
+    const historico = { cpu: [], ram: [], proc: [] };
+
+    function registrar(chave, valor) {
+      historico[chave].push({ t: Date.now(), v: valor });
+      if (historico[chave].length > MAX_PONTOS) historico[chave].shift();
+      if (!$('painelDes').hidden) desenharGraficos();
+    }
+
+    /* ---- Abas ---- */
+    function mostrarAba(qual) {
+      const proc = qual === 'proc';
+      $('abaProc').setAttribute('aria-selected', proc);
+      $('abaDes').setAttribute('aria-selected', !proc);
+      $('painelProc').hidden = !proc;
+      $('painelDes').hidden = proc;
+      if (!proc) desenharGraficos();
+    }
+    $('abaProc').addEventListener('click', () => mostrarAba('proc'));
+    $('abaDes').addEventListener('click', () => mostrarAba('des'));
+
+    /* ---- Tabela de processos ---- */
+    let dadosProc = null;
+    let ordem = { col: 'cpu', desc: true };
+
+    const ordemPadrao = { nome: false, usuario: false, estado: false, comando: false, pid: false, ppid: false };
+
+    function comparar(a, b) {
+      const va = a[ordem.col], vb = b[ordem.col];
+      let r;
+      if (typeof va === 'string' || typeof vb === 'string') r = String(va ?? '').localeCompare(String(vb ?? ''), 'pt-BR');
+      else r = (va ?? -1) - (vb ?? -1);
+      return ordem.desc ? -r : r;
+    }
+
+    function tempoFmt(seg) {
+      if (seg == null) return '—';
+      if (seg < 60) return seg.toFixed(1) + ' s';
+      const h = Math.floor(seg / 3600), m = Math.floor((seg % 3600) / 60), s = Math.floor(seg % 60);
+      return h ? `${h}h ${m}m` : `${m}m ${s}s`;
+    }
+
+    // Fundo da célula mais intenso quanto maior o uso (como o Gerenciador de Tarefas do Windows)
+    function calor(fracao) {
+      const a = Math.min(0.45, Math.max(0, fracao) * 0.45);
+      return a > 0.01 ? `background: color-mix(in srgb, var(--accent) ${(a * 100).toFixed(0)}%, transparent)` : '';
+    }
+
+    function renderTabela() {
+      if (!dadosProc) return;
+      const filtro = $('procFiltro').value.trim().toLowerCase();
+      const cadeiaPids = new Set(dadosProc.cadeia.map((c) => c.pid));
+      const memMax = Math.max(1, ...dadosProc.processos.map((p) => p.memoria || 0));
+      const linhas = dadosProc.processos
+        .filter((p) => !filtro || [p.nome, p.comando, p.usuario, String(p.pid)].some((x) => String(x ?? '').toLowerCase().includes(filtro)))
+        .sort(comparar);
+
+      $('procCorpo').innerHTML = linhas.map((p) => {
+        const classe = p.pid === dadosProc.pidAplicacao ? 'app' : (cadeiaPids.has(p.pid) ? 'ancestral' : '');
+        return `<tr class="${classe}">
+          <td>${esc(p.nome)}${p.pid === dadosProc.pidAplicacao ? ' <span class="chip">esta aplicação</span>' : ''}</td>
+          <td class="num">${p.pid}</td>
+          <td class="num">${p.ppid ?? '—'}</td>
+          <td>${esc(p.usuario ?? '—')}</td>
+          <td>${p.estadoDescricao ? `<span class="estado" title="Código ${esc(p.estado)}">${esc(p.estadoDescricao)}</span>` : '—'}</td>
+          <td class="num">${p.threads ?? '—'}</td>
+          <td class="num" style="${p.cpu != null ? calor(p.cpu / 100 * 4) : ''}">${p.cpu != null ? p.cpu.toFixed(1) + ' %' : '—'}</td>
+          <td class="num" style="${calor((p.memoria || 0) / memMax)}">${bytes(p.memoria) ?? '—'}</td>
+          <td class="num">${tempoFmt(p.tempoCpu)}</td>
+          <td class="cmd" title="${esc(p.comando)}">${esc(p.comando)}</td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="10">Nenhum processo encontrado com esse filtro</td></tr>';
+
+      document.querySelectorAll('.tabela-proc th').forEach((th) => {
+        th.setAttribute('aria-sort', th.dataset.col === ordem.col ? (ordem.desc ? 'descending' : 'ascending') : 'none');
+      });
+    }
+
+    function ordenarPor(col) {
+      if (ordem.col === col) ordem.desc = !ordem.desc;
+      else ordem = { col, desc: !(col in ordemPadrao) };
+      const opcao = [...$('procOrdem').options].find((o) => o.value === col);
+      if (opcao) $('procOrdem').value = col;
+      renderTabela();
+    }
+    document.querySelectorAll('.tabela-proc th').forEach((th) => th.addEventListener('click', () => ordenarPor(th.dataset.col)));
+    $('procOrdem').addEventListener('change', (e) => { ordem = { col: e.target.value, desc: !(e.target.value in ordemPadrao) }; renderTabela(); });
+    $('procFiltro').addEventListener('input', renderTabela);
+
+    async function atualizarProcessos() {
+      try {
+        const r = await fetch('/api/processos', { cache: 'no-store' });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detalhe || 'erro');
+        dadosProc = d;
+
+        set('kProc', d.total);
+        set('kProcDet', d.threads ? d.threads + ' threads' : 'visíveis para a aplicação');
+
+        const estados = Object.entries(d.porEstado).sort((a, b) => b[1] - a[1])
+          .map(([k, v]) => `<span class="chip">${esc(k)}: <b>${v}</b></span>`).join('');
+        $('procResumo').innerHTML =
+          `<span class="chip">Processos: <b>${d.total}</b></span>` +
+          (d.threads ? `<span class="chip">Threads: <b>${d.threads}</b></span>` : '') +
+          `<span class="chip">Memória somada: <b>${esc(bytes(d.memoriaSomada))}</b></span>` + estados;
+
+        $('procCadeia').innerHTML = d.cadeia.length
+          ? 'Árvore desta aplicação (filho ← pai): ' + d.cadeia.map((c) =>
+              `<span class="no">${esc(c.nome)} <span class="mono">(${c.pid})</span></span>`).join(' ← ')
+          : '';
+        set('procNota', `Fonte: ${d.fonte}. Mostrando ${d.exibidos} de ${d.total} processos. ` +
+          'CPU = % da capacidade total da máquina (todos os núcleos), como no Gerenciador de Tarefas do Windows.');
+        renderTabela();
+        registrar('proc', d.total);
+      } catch (e) {
+        $('procCorpo').innerHTML = '<tr><td colspan="10" class="erro">Não foi possível listar os processos</td></tr>';
+      }
+    }
+
+    /* ---- Gráficos de desempenho (SVG) ---- */
+    const NS = 'http://www.w3.org/2000/svg';
+    const miraAtiva = {};
+    function el(tag, attrs, pai) {
+      const e = document.createElementNS(NS, tag);
+      for (const k in attrs) e.setAttribute(k, attrs[k]);
+      if (pai) pai.appendChild(e);
+      return e;
+    }
+
+    function desenhar(container, serie, { max, unidade, casas }) {
+      const area = container.querySelector('.area');
+      const atual = container.querySelector('.atual');
+      area.innerHTML = '';
+      if (!serie.length) { atual.textContent = 'Aguardando leituras…'; return; }
+      const fmt = (v) => v.toFixed(casas) + unidade;
+      atual.textContent = 'Agora: ' + fmt(serie[serie.length - 1].v) +
+        ' · máx. no período: ' + fmt(Math.max(...serie.map((p) => p.v)));
+
+      const L = area.clientWidth || 320, A = 170, esq = 34, dir = 8, topo = 8, base = 20;
+      // Escala com números "redondos" (passos de 1, 2, 2,5 ou 5 × 10^n)
+      const passoBonito = (bruto) => { const m = 10 ** Math.floor(Math.log10(bruto)); const f = bruto / m; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * m; };
+      const topoEscala = max ?? passoBonito(Math.max(1, Math.max(...serie.map((p) => p.v)) * 1.15) / 4) * 4;
+      const x = (i) => esq + (L - esq - dir) * (MAX_PONTOS === 1 ? 0 : i / (MAX_PONTOS - 1));
+      const y = (v) => topo + (A - topo - base) * (1 - v / topoEscala);
+      const svg = el('svg', { viewBox: `0 0 ${L} ${A}`, role: 'img', 'aria-label': container.querySelector('h3').textContent + ': ' + fmt(serie[serie.length - 1].v) });
+      area.appendChild(svg);
+
+      for (let k = 0; k <= 4; k++) {
+        const v = (topoEscala / 4) * k;
+        el('line', { x1: esq, x2: L - dir, y1: y(v), y2: y(v), class: 'grade' }, svg);
+        el('text', { x: esq - 6, y: y(v) + 3, 'text-anchor': 'end', class: 'eixo' }, svg).textContent =
+          Number.isInteger(v) ? v : v.toFixed(1);
+      }
+      el('text', { x: esq, y: A - 4, class: 'eixo' }, svg).textContent = '3 min atrás';
+      el('text', { x: L - dir, y: A - 4, 'text-anchor': 'end', class: 'eixo' }, svg).textContent = 'agora';
+
+      // Os pontos ocupam o lado direito; o gráfico "anda" para a esquerda como no Gerenciador de Tarefas
+      const desloc = MAX_PONTOS - serie.length;
+      const pts = serie.map((p, i) => [x(i + desloc), y(Math.min(p.v, topoEscala))]);
+      const d = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+      el('path', { d: d + ` L${pts[pts.length - 1][0]} ${y(0)} L${pts[0][0]} ${y(0)} Z`, class: 'lavagem' }, svg);
+      el('path', { d, class: 'linha' }, svg);
+      const fim = pts[pts.length - 1];
+      el('circle', { cx: fim[0], cy: fim[1], r: 4, class: 'ponto' }, svg);
+
+      // Mira + dica ao passar o mouse
+      const mira = el('line', { y1: topo, y2: A - base, class: 'mira', visibility: 'hidden' }, svg);
+      const marca = el('circle', { r: 4, class: 'ponto', visibility: 'hidden' }, svg);
+      const dica = document.createElement('div');
+      dica.className = 'dica'; dica.hidden = true; area.appendChild(dica);
+      const alvo = el('rect', { x: esq, y: 0, width: L - esq - dir, height: A, fill: 'transparent' }, svg);
+      function mostrarDica(px) {
+        const caixa = svg.getBoundingClientRect();
+        let i = Math.round(((px - esq) / (L - esq - dir)) * (MAX_PONTOS - 1)) - desloc;
+        i = Math.max(0, Math.min(serie.length - 1, i));
+        const [cx, cy] = pts[i];
+        mira.setAttribute('x1', cx); mira.setAttribute('x2', cx); mira.setAttribute('visibility', 'visible');
+        marca.setAttribute('cx', cx); marca.setAttribute('cy', cy); marca.setAttribute('visibility', 'visible');
+        dica.hidden = false;
+        dica.style.left = (cx / L * 100) + '%';
+        dica.style.top = (cy / A * caixa.height) + 'px';
+        dica.replaceChildren();
+        const b = document.createElement('b'); b.textContent = fmt(serie[i].v);
+        const sp = document.createElement('span'); sp.textContent = ' · ' + new Date(serie[i].t).toLocaleTimeString('pt-BR');
+        dica.append(b, sp);
+      }
+      alvo.addEventListener('pointermove', (ev) => {
+        const caixa = svg.getBoundingClientRect();
+        const px = (ev.clientX - caixa.left) * (L / caixa.width);
+        miraAtiva[container.id] = px;
+        mostrarDica(px);
+      });
+      alvo.addEventListener('pointerleave', () => {
+        delete miraAtiva[container.id];
+        mira.setAttribute('visibility', 'hidden'); marca.setAttribute('visibility', 'hidden'); dica.hidden = true;
+      });
+      // O gráfico é redesenhado a cada leitura; mantém a dica se o mouse continua em cima
+      if (miraAtiva[container.id] !== undefined) mostrarDica(miraAtiva[container.id]);
+    }
+
+    function desenharGraficos() {
+      desenhar($('gCpu'), historico.cpu, { max: 100, unidade: ' %', casas: 1 });
+      desenhar($('gRam'), historico.ram, { max: 100, unidade: ' %', casas: 1 });
+      desenhar($('gProc'), historico.proc, { max: null, unidade: '', casas: 0 });
+    }
+    window.addEventListener('resize', () => { if (!$('painelDes').hidden) desenharGraficos(); });
+
+    atualizarProcessos();
+    setInterval(atualizarProcessos, 3000);
+
     atualizar();
-    setInterval(atualizar, 2000);
+    setInterval(atualizar, 3000);
   </script>
 </body>
 </html>
