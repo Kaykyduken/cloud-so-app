@@ -116,7 +116,8 @@ function infoVirtualizacao() {
     flagHypervisor,
     fabricante,
     produto,
-    kernelAws: /aws/i.test(kernel),
+    // "-aws" = kernel Ubuntu para AWS (Render); "amzn" = Amazon Linux (AWS Lambda, usado pela Vercel)
+    kernelAws: /aws|amzn/i.test(kernel),
   };
 }
 
@@ -365,6 +366,9 @@ app.get('/api/info', async (req, res) => {
       cotaCpuContainer: cotaCpuCgroup(),
       virtualizacao: infoVirtualizacao(),
       porta: process.env.PORT || null,
+      // Rodando direto (npm start, Render, Railway), o processo abre a porta com app.listen().
+      // Em serverless (Vercel), o arquivo é importado pela plataforma e nenhuma porta é aberta.
+      abrePorta: require.main === module,
       nodeEnv: process.env.NODE_ENV || null,
       variaveis: variaveisAmbiente(),
     },

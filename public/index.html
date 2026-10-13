@@ -467,7 +467,10 @@
         set('envModelo', amb.modelo);
         set('envRegiao', amb.regiao || 'não informada');
         set('envServico', amb.servico);
-        set('envPorta', amb.porta || '3000 (padrão local)');
+        set('envPorta', amb.porta ||
+          (amb.abrePorta === false
+            ? 'não se aplica (serverless: a plataforma entrega a requisição à função)'
+            : '3000 (padrão local)'));
         set('envNodeEnv', amb.nodeEnv || 'não definido (development)');
         set('envContainer', simNao(amb.container));
         set('virtFlag', simNao(amb.virtualizacao.flagHypervisor) +
