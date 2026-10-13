@@ -1,0 +1,9 @@
+# Guarda os arquivos de texto com quebra de linha LF no repositório,
+# mesmo editando no Windows (CRLF) e no Linux (LF). Evita "alterações"
+# falsas no git status e mantém o código igual ao que roda no Render.
+* text=auto eol=lf
+
+# Imagens e binários: nunca converter
+*.png binary
+*.jpg binary
+*.ico binary

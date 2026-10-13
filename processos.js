@@ -3,7 +3,9 @@
  *
  * Linux: lê o sistema de arquivos virtual /proc, onde o kernel publica um
  *        diretório por processo (/proc/<PID>/stat, status, cmdline).
- * Windows: usa o PowerShell (Get-Process); se falhar, o comando tasklist.
+ * Windows: consulta a classe WMI Win32_Process pelo PowerShell (Get-CimInstance),
+ *          que informa o processo pai (PPID); o dono de cada processo vem do
+ *          tasklist /v. Se falhar, usa Get-Process e, por último, tasklist.
  * macOS/outros: usa o comando ps.
  *
  * O %CPU de cada processo é calculado comparando o tempo de CPU acumulado
@@ -153,13 +155,115 @@ function executar(cmd, args, timeout = 8000) {
 
 let anteriorWin = null;
 
+/** %CPU a partir do tempo de CPU acumulado (segundos) entre duas leituras. */
+function cpuEntreLeituras(mapaAnt, dt, pid, tempo) {
+  const ant = mapaAnt ? mapaAnt.get(pid) : undefined;
+  return ant !== undefined && dt > 0 ? Math.max(0, (100 * (tempo - ant)) / dt) : 0;
+}
+
+/**
+ * Dono de cada processo (Windows).
+ * O Win32_Process só informa o dono chamando o método GetOwner() processo a
+ * processo, o que é lento. O "tasklist /v" traz todos de uma vez, mas também
+ * leva alguns segundos, então ele roda em segundo plano a cada 30 s e o
+ * resultado fica em cache. Sem privilégio de administrador, o Windows não
+ * revela o dono de processos de outros usuários e do sistema (aparece "—").
+ */
+let donosWin = { instante: 0, mapa: new Map(), atualizando: false };
+
+function atualizarDonosWindows() {
+  if (donosWin.atualizando || Date.now() - donosWin.instante < 30000) return;
+  donosWin.atualizando = true;
+  executar('tasklist', ['/v', '/fo', 'csv', '/nh'], 20000)
+    .then((saida) => {
+      const mapa = new Map();
+      for (const linha of saida.trim().split(/\r?\n/)) {
+        // Colunas: Nome, PID, Sessão, Sessão#, Memória, Status, Usuário, Tempo de CPU, Título
+        const c = linha.replace(/^"|"$/g, '').split('","');
+        const pid = Number(c[1]);
+        const usuario = c[6] || '';
+        if (pid && usuario && !/^(N\/A|N\/D)$/i.test(usuario)) {
+          mapa.set(pid, usuario.split('\\').pop()); // "MAQUINA\kayky" → "kayky"
+        }
+      }
+      donosWin = { instante: Date.now(), mapa, atualizando: false };
+    })
+    .catch(() => {
+      donosWin = { ...donosWin, instante: Date.now(), atualizando: false };
+    });
+}
+
+/**
+ * Windows via WMI (Win32_Process): traz PPID, linha de comando, threads,
+ * prioridade, memória (working set), tempo de CPU em modo usuário e em modo
+ * kernel (em unidades de 100 ns) e há quanto tempo o processo foi criado.
+ */
+async function processosWindowsCim() {
+  const script =
+    '[Console]::OutputEncoding = [Text.Encoding]::UTF8; $agora = Get-Date; ' +
+    'Get-CimInstance Win32_Process | Select-Object ' +
+    '@{n="Id";e={$_.ProcessId}},@{n="Ppid";e={$_.ParentProcessId}},Name,CommandLine,' +
+    '@{n="Threads";e={$_.ThreadCount}},@{n="Prio";e={$_.Priority}},' +
+    '@{n="Mem";e={[double]$_.WorkingSetSize}},' +
+    '@{n="Cpu";e={([double]$_.UserModeTime + [double]$_.KernelModeTime) / 1e7}},' +
+    '@{n="Idade";e={if ($_.CreationDate) { [math]::Round(($agora - $_.CreationDate).TotalSeconds) } else { $null }}} ' +
+    '| ConvertTo-Json -Compress';
+  const saida = await executar('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], 15000);
+  const dados = JSON.parse(saida);
+
+  atualizarDonosWindows();
+
+  const agora = Date.now();
+  const nucleos = os.cpus().length || 1;
+  const mapaAnt = anteriorWin && agora - anteriorWin.instante < 15000 ? anteriorWin.mapa : null;
+  const dt = mapaAnt ? (agora - anteriorWin.instante) / 1000 : 0;
+  const mapa = new Map();
+
+  const lista = (Array.isArray(dados) ? dados : [dados]).map((p) => {
+    const tempo = p.Cpu || 0;
+    mapa.set(p.Id, tempo);
+    const cpuNucleo = cpuEntreLeituras(mapaAnt, dt, p.Id, tempo);
+    const nome = String(p.Name || '').replace(/\.exe$/i, '');
+    return {
+      pid: p.Id,
+      // PID 0 (System Idle Process) e 4 (System) não têm um pai real
+      ppid: p.Id === 0 || p.Id === 4 ? null : p.Ppid,
+      nome,
+      comando: p.CommandLine ? p.CommandLine.slice(0, 160) : `[${nome}]`,
+      estado: null, // o Windows não expõe um estado por processo como o Linux
+      estadoDescricao: null,
+      usuario: donosWin.mapa.get(p.Id) || null,
+      threads: p.Threads,
+      prioridade: p.Prio,
+      nice: null,
+      memoria: p.Mem,
+      cpu: Number((cpuNucleo / nucleos).toFixed(1)),
+      cpuNucleo: Number(cpuNucleo.toFixed(1)),
+      tempoCpu: tempo,
+      executandoHa: p.Idade,
+    };
+  });
+  anteriorWin = { instante: agora, mapa };
+  return {
+    fonte: 'WMI Win32_Process via PowerShell (Windows)' + (mapaAnt ? '' : ' — %CPU aparece a partir da 2ª leitura'),
+    lista,
+    cpuPorNucleo: !!mapaAnt,
+  };
+}
+
 async function processosWindows() {
+  try {
+    return await processosWindowsCim();
+  } catch {
+    // segue para o Get-Process
+  }
   try {
     const script =
       'Get-Process | Select-Object Id,ProcessName,CPU,WorkingSet64,' +
       '@{n="Threads";e={$_.Threads.Count}},@{n="Prio";e={$_.BasePriority}} | ConvertTo-Json -Compress';
     const saida = await executar('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script]);
     const dados = JSON.parse(saida);
+    atualizarDonosWindows();
     const agora = Date.now();
     const nucleos = os.cpus().length || 1;
     const mapaAnt = anteriorWin && agora - anteriorWin.instante < 15000 ? anteriorWin.mapa : null;
@@ -168,8 +272,7 @@ async function processosWindows() {
     const lista = (Array.isArray(dados) ? dados : [dados]).map((p) => {
       const tempo = p.CPU || 0; // segundos de CPU acumulados
       mapa.set(p.Id, tempo);
-      const ant = mapaAnt ? mapaAnt.get(p.Id) : undefined;
-      const cpuNucleo = ant !== undefined && dt > 0 ? (100 * (tempo - ant)) / dt : 0;
+      const cpuNucleo = cpuEntreLeituras(mapaAnt, dt, p.Id, tempo);
       return {
         pid: p.Id,
         ppid: null,
@@ -177,7 +280,7 @@ async function processosWindows() {
         comando: p.ProcessName,
         estado: null,
         estadoDescricao: null,
-        usuario: null,
+        usuario: donosWin.mapa.get(p.Id) || null,
         threads: p.Threads,
         prioridade: p.Prio,
         nice: null,
@@ -251,11 +354,17 @@ function cadeiaDaAplicacao(lista) {
 }
 
 let cache = null;
+let emAndamento = null;
 
-async function obterProcessos() {
-  // Evita abrir vários PowerShell/ps se a página pedir muito rápido
-  if (cache && Date.now() - cache.instante < 1500) return cache.dados;
+function obterProcessos() {
+  // Evita abrir vários PowerShell/ps se a página pedir muito rápido:
+  // reaproveita a última resposta (até 1,5 s) ou a leitura que ainda está em andamento.
+  if (cache && Date.now() - cache.instante < 1500) return Promise.resolve(cache.dados);
+  if (!emAndamento) emAndamento = coletarProcessos().finally(() => { emAndamento = null; });
+  return emAndamento;
+}
 
+async function coletarProcessos() {
   let r;
   if (process.platform === 'linux' && fs.existsSync('/proc/self/stat')) r = await processosLinux();
   else if (process.platform === 'win32') r = await processosWindows();
